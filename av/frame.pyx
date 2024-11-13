@@ -154,8 +154,9 @@ cdef class Frame:
         This is a wrapper around :ffmpeg:`av_frame_make_writable`.
         """
         cdef int ret
-
+        
         ret = lib.av_frame_make_writable(self.ptr)
+        err_check(ret)
         err_check(ret)
 
     @property

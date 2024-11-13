@@ -3,7 +3,8 @@ from av.enum cimport define_enum
 from collections.abc import Mapping
 
 from av.sidedata.motionvectors import MotionVectors
-
+from libc.string cimport memcpy
+from av.bytesource cimport ByteSource, bytesource
 
 cdef object _cinit_bypass_sentinel = object()
 

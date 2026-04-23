@@ -3,6 +3,7 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+
 jobs:
   package-source:
     runs-on: ubuntu-latest
@@ -28,45 +29,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            arch: AMD64
+          # 仅保留 Linux ARM64 构建 (使用 GitHub 原生 ARM64 运行器)
+          - os: ubuntu-24.04-arm64
+            arch: aarch64
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
+
+      # 如果后续需要退回到 ubuntu-latest 使用模拟器，此步骤会生效
       - name: Set up QEMU
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.arch == 'aarch64' && matrix.os == 'ubuntu-latest'
         uses: docker/setup-qemu-action@v3
-      - name: Install packages
-        if: matrix.os == 'macos-13'
-        run: |
-          brew update
-          brew install pkg-config
-      - name: Set Minimum MacOS Target
-        if: matrix.os == 'macos-13' || matrix.os == 'macos-14'
-        run: |
-          echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> $GITHUB_ENV
+
       - name: Build wheels
         env:
           CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_BEFORE_ALL_LINUX: yum install -y alsa-lib libxcb
-          CIBW_BEFORE_BUILD: python scripts/fetch-vendor.py --config-file scripts/ffmpeg-7.1.json /tmp/vendor
-          CIBW_BEFORE_BUILD_MACOS: python scripts/fetch-vendor.py --config-file scripts/ffmpeg-7.1.json /tmp/vendor
-          CIBW_BEFORE_BUILD_WINDOWS: python scripts\fetch-vendor.py --config-file scripts\ffmpeg-7.1.json C:\cibw\vendor
+          # Linux (manylinux/Rocky) 依赖安装
+          CIBW_BEFORE_ALL_LINUX: yum install -y alsa-lib libxcb pkgconfig
+          # Linux 前置构建脚本
+          CIBW_BEFORE_BUILD_LINUX: python scripts/fetch-vendor.py --config-file scripts/ffmpeg-7.1.json /tmp/vendor
+          # Linux 环境变量
           CIBW_ENVIRONMENT_LINUX: LD_LIBRARY_PATH=/tmp/vendor/lib:$LD_LIBRARY_PATH PKG_CONFIG_PATH=/tmp/vendor/lib/pkgconfig
-          CIBW_ENVIRONMENT_MACOS: PKG_CONFIG_PATH=/tmp/vendor/lib/pkgconfig LDFLAGS=-headerpad_max_install_names
-          CIBW_ENVIRONMENT_WINDOWS: INCLUDE=C:\\cibw\\vendor\\include LIB=C:\\cibw\\vendor\\lib PYAV_SKIP_TESTS=unicode_filename
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: delvewheel repair --add-path C:\cibw\vendor\bin -w {dest_dir} {wheel}
+          # 跳过不必要的镜像构建 (musl 针对 alpine)
           CIBW_SKIP: "*-musllinux*"
-          # CIBW_TEST_COMMAND: mv {project}/av {project}/av.disabled && python -m pytest {package}/tests && mv {project}/av.disabled {project}/av
-          # CIBW_TEST_REQUIRES: pytest numpy
-          # # skip tests when there are no binary wheels of numpy
-          # CIBW_TEST_SKIP: pp* *_i686
         run: |
-          pip install cibuildwheel delvewheel
+          pip install cibuildwheel
           cibuildwheel --output-dir dist
         shell: bash
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:

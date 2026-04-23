@@ -30,7 +30,7 @@ jobs:
       matrix:
         include:
           # 仅保留 Linux ARM64 构建 (使用 GitHub 原生 ARM64 运行器)
-          - os: ubuntu-24.04-arm64
+          - os: ubuntu-24.04-arm
             arch: aarch64
     steps:
       - uses: actions/checkout@v4
